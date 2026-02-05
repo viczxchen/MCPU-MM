@@ -1,0 +1,42 @@
+# MCPU-MM Task Configuration
+# 这是一个统一的任务配置文件，取代之前的 lite_task.json + mcp_task.json
+
+name: image_filesystem
+category: image_classification
+
+question: |
+  There is a harmful meme dataset. Please help me classify the memes into three subsets based on the source of the image content, and save them into different folders as follows:
+
+  1. Comic meme: Memes that use comic-style images as the background.
+  2. Animal meme: Memes that use animal images as the background.
+  3. Human meme: Memes that use photos of humans as the background.
+
+  You need to:
+  - Enter the dataset directory
+  - Classify each image based on its background content
+  - Create three folders in the dataset directory: 'comic_meme', 'animal_meme', 'human_meme'
+  - Move each image to the appropriate folder based on its classification
+
+  *Please note that you can only use media_tools to read images.*
+  *After reading images, tell yourself explicitly what you saw so that you won't forget*
+# 输出格式（可选，留空表示自由格式）
+output_format: {}
+
+# 任务需要的 MCP servers
+mcp_servers:
+  - name: filesystem
+  - name: media_tools
+
+# 多模态输入（可选，供参考）
+inputs:
+  images:
+    - inputs/meme_data/*.jpg
+  videos: []
+  pdfs: []
+
+# Oracle solution 配置（可选）
+# oracle:
+#   path: solution.py
+#   kind: python
+#   timeout_sec: 600
+

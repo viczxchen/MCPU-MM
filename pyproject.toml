@@ -1,0 +1,18 @@
+[project]
+name = "mcpu-mm"
+version = "0.1.0"
+description = "Minimal multimodal harness with environment isolation, reusing MCP-Universe."
+requires-python = ">=3.10"
+dependencies = [
+    "docker>=7.0.0",
+    "pydantic>=2.7.0",
+    "pyyaml>=6.0.0",
+    # MCP-Universe should be installed in the same environment, e.g.:
+    # pip install -e ../MCP-Universe
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+

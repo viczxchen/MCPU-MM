@@ -1,0 +1,46 @@
+services:
+  # Combined container: task runtime + MCP servers
+  # For offline tasks, this single container handles both task execution and MCP servers
+  task-env:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mcpu-mm-image-filesystem:${MCPU_MM_TASK_NAME:-image_filesystem}
+    container_name: mcpu-mm-image-filesystem-${MCPU_MM_TASK_NAME:-image_filesystem}
+    working_dir: /workspace
+    volumes:
+      # MCP-Universe and MCPU-MM for MCP servers
+      - ../../../MCP-Universe:/mcp-universe:ro
+      - ../..:/mcpu-mm:ro
+      # 挂载 inputs 目录（只读），这样改了 inputs 不需要重新 build
+      - ./inputs:/inputs:ro
+    environment:
+      - PYTHONPATH=/mcp-universe:/mcpu-mm:/workspace
+      - FILESYSTEM_DIRECTORY=/workspace
+      # Ensure FastMCP SSE servers listen on all interfaces (needed for Docker port mapping)
+      - FASTMCP_HOST=0.0.0.0
+    # Run Gateway (for filesystem stdio server) and media_tools SSE server
+    command:
+      - sh
+      - -c
+      - |
+        # 每次容器启动时，从挂载的 /inputs 复制到 /workspace
+        # 这样改了 inputs/ 后不需要重新 build 镜像
+        rm -rf /workspace/*
+        cp -r /inputs/. /workspace/
+
+        # Start Gateway in stdio mode for filesystem server
+        # Gateway will bridge stdio filesystem server to SSE endpoint
+        python3 -m mcpuniverse.mcp.gateway \
+          --port 3333 \
+          --config /mcp-universe/mcpuniverse/mcp/configs/server_list.json \
+          --mode stdio \
+          --servers filesystem &
+        # Start media_tools MCP server directly in SSE mode (it supports SSE natively)
+        python3 -m mcpuniverse.mcp.servers.media_tools --transport sse --port 4444 &
+        # Keep container running
+        sleep infinity
+    ports:
+      - "${FILESYSTEM_MCP_PORT:-3333}:3333"
+      - "${MEDIA_TOOLS_MCP_PORT:-4444}:4444"
+
