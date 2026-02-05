@@ -1,4 +1,4 @@
-## MCPU-MM: Minimal Multimodal Harness with Environment Isolation
+## MCPU-MM
 
 一个轻量级 harness，目前的目标：
 
