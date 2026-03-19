@@ -10,6 +10,7 @@ question: |
   Requirements:
   - Inspect the image with media_tools and extract key clues.
   - Use Playwright and google-search for at least two evidence-gathering hops.
+  - Public image URL (for tools that require image_url): https://cdn.jsdelivr.net/gh/viczxchen/MCPU-MM@f20b19952a24f80150b8a9aea3fd06c508c3285a/tasks/online_image/complex_reasoning/inputs/66ea857b6b8edd4f56302c06_rationale.png
   - Return only the final answer text.
 
 output_format: {}

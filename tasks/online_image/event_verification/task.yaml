@@ -10,6 +10,7 @@ question: |
   Requirements:
   - Use media_tools to inspect the image and collect visual clues.
   - Use Playwright and google-search to find trustworthy corroborating sources.
+  - Public image URL (for tools that require image_url): https://cdn.jsdelivr.net/gh/viczxchen/MCPU-MM@f20b19952a24f80150b8a9aea3fd06c508c3285a/tasks/online_image/event_verification/inputs/1_trump-38893217.webp
   - Provide exactly one label: "True", "False", or "Unverifiable".
 
 output_format: {}
