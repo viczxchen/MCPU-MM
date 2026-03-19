@@ -1,0 +1,26 @@
+# MCPU-MM Task Configuration
+
+name: event_verification
+category: online_image_qa
+
+question: |
+  You are given an image and a claimed event statement.
+  Verify whether the claim is true, false, or unverifiable based on online evidence.
+
+  Requirements:
+  - Use media_tools to inspect the image and collect visual clues.
+  - Use Playwright and google-search to find trustworthy corroborating sources.
+  - Provide exactly one label: "True", "False", or "Unverifiable".
+
+output_format: {}
+
+mcp_servers:
+  - name: playwright
+  - name: google-search
+  - name: media_tools
+
+inputs:
+  images:
+    - inputs/1_trump-38893217.webp
+  videos: []
+  pdfs: []

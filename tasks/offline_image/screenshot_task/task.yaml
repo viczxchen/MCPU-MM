@@ -1,0 +1,24 @@
+# MCPU-MM Task Configuration
+
+name: screenshot_task
+category: offline_image_filesystem
+
+question: |
+  Help me organize the files in /workspace so that the file structure matches the target screenshot in /workspace/target.png.
+
+  Requirements:
+  - Create exactly three folders: images, others, videos
+  - Move files into matching folders
+  - Keep all original files (do not delete)
+
+output_format: {}
+
+mcp_servers:
+  - name: filesystem
+  - name: media_tools
+
+inputs:
+  images:
+    - inputs/target.png
+  videos: []
+  pdfs: []

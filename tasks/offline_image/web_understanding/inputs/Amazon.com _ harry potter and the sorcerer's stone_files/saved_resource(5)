@@ -1,0 +1,48 @@
+<?
+	/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 	
+	* AMAZON DSP
+	* Almacenamos el ID de usuario de AMAZON DSP. Redis + Log + Cookie
+	* @Author: Carlos Ruiz
+	* TCF 2.2 (Ready 19/05/2025)
+	* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+	require_once '/home/common/geoip/vendor/autoload.php';	
+	require_once $_SERVER['DOCUMENT_ROOT']."/inc_v2/legal/consent_string.tfc2.lib.php";
+	require_once $_SERVER['DOCUMENT_ROOT']."/inc_v2/func.lib.php";	
+	require_once $_SERVER['DOCUMENT_ROOT']."/inc_v2/vari.node.lib.php";		
+
+	// Personalizacion del nodo
+	$plid = 137; // ID de Plataforma
+	$vendorId = 793; // ID de Plataforma en TCF
+	$exitType = "redirect";  // Qué devolvemos al terminar?
+	$cookieName = "amz";
+
+	// Revisamos el consent string
+	checkConsent($vendorId);
+
+	// Guardamos en log
+	logRequest($plid);
+
+	// Guardamos en log
+	saveCookie($cookieName);
+
+	// Guardamos en redis
+	logRedis($cookieName);
+	
+	// Finalizamos la request con el redirect hacía su sitema
+	$redirect = $_GET['r'] ?? '';
+	if (is_valid_url($redirect)) {
+		$redirect = replaceMacros($redirect);
+		
+		// UID de AMAZON
+		$redirect = str_ireplace("[uid]", $_GET['uid'], $redirect);
+		
+		// GPP Macros
+		$redirect = str_ireplace("[us_privacy]", $_GET['us_privacy'], $redirect);
+		$redirect = str_ireplace("[gpp]", $_GET['gpp'], $redirect);
+		$redirect = str_ireplace("[gpp_sid]", $_GET['gpp_sid'], $redirect);
+		
+		header("Location: $redirect");
+	} else {
+		closeRequest("png");
+	}
+	

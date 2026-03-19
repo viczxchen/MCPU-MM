@@ -14,7 +14,7 @@ This script:
 
     cd /Users/vichen/school/MCP/MCPU-MM
     source /Users/vichen/school/MCP/MCP-Universe/venv/bin/activate
-    python tasks/image_filesystem/solution.py
+    python tasks/offline_image/image_filesystem/solution.py
 """
 
 from __future__ import annotations
@@ -33,9 +33,9 @@ from mcpuniverse.mcp.manager import MCPManager
 
 
 # Ensure we can import the local `harness` package when running this file directly.
-# When executed as `python tasks/image_filesystem/solution.py`, sys.path[0] is
-# this directory (`tasks/image_filesystem`), so we need to add the project root.
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# When executed as `python tasks/offline_image/image_filesystem/solution.py`, sys.path[0] is
+# this directory (`tasks/offline_image/image_filesystem`), so we need to add the project root.
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 

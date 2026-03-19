@@ -1,0 +1,26 @@
+# MCPU-MM Task Configuration
+
+name: online_shopping
+category: online_image_qa
+
+question: |
+  You are given a product image.
+  Find the most likely product listing online and report the requested shopping fact.
+
+  Requirements:
+  - Use media_tools to identify product details from the image.
+  - Use Playwright and google-search to locate matching listings.
+  - Return exactly one concise answer (for example model/version or current price).
+
+output_format: {}
+
+mcp_servers:
+  - name: playwright
+  - name: google-search
+  - name: media_tools
+
+inputs:
+  images:
+    - inputs/MMsearch_sample.png
+  videos: []
+  pdfs: []

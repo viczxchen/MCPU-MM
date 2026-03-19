@@ -1,0 +1,27 @@
+# MCPU-MM Task Configuration
+
+name: location_identification
+category: online_image_qa
+
+question: |
+  You are given a query image under /workspace.
+  Identify the location shown in the image as precisely as possible.
+
+  Requirements:
+  - Use media_tools to inspect the image details first.
+  - Use Playwright and google-search to gather evidence from the web.
+  - Return only one final answer in this format:
+    "<country>, <city>, <landmark_or_place_name>"
+
+output_format: {}
+
+mcp_servers:
+  - name: playwright
+  - name: google-search
+  - name: media_tools
+
+inputs:
+  images:
+    - inputs/WechatIMG158.jpg
+  videos: []
+  pdfs: []

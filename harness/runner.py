@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, Optional, List
+import sys
 
 from mcpuniverse.agent.base import BaseAgent
 from mcpuniverse.common.context import Context
@@ -73,10 +74,21 @@ class LiteRunner:
             # Call verify function
             verify_func = evaluate_module.verify
             import inspect
+            verify_sig = inspect.signature(verify_func)
+            # Allow evaluators to optionally consume the agent's final answer:
+            #   verify(test_dir, container_name, agent_result)
+            # Keep backward compatibility with the existing 2-arg form.
+            supports_agent_result = len(verify_sig.parameters) >= 3
             if inspect.iscoroutinefunction(verify_func):
-                passed, error_msg = await verify_func(task_dir, container_name)
+                if supports_agent_result:
+                    passed, error_msg = await verify_func(task_dir, container_name, agent_result)
+                else:
+                    passed, error_msg = await verify_func(task_dir, container_name)
             else:
-                passed, error_msg = verify_func(task_dir, container_name)
+                if supports_agent_result:
+                    passed, error_msg = verify_func(task_dir, container_name, agent_result)
+                else:
+                    passed, error_msg = verify_func(task_dir, container_name)
             
             result = {
                 "config": {
@@ -144,40 +156,108 @@ class LiteRunner:
 
             # Get MCP server port mappings
             port_mapping = env.get_mcp_server_ports()
+            requested_servers = {cfg.name for cfg in spec.mcp_servers}
             
             # Wait for Gateway to be ready (if using containerized servers)
             import asyncio
             import httpx
             from os import getenv
             
-            # Fallback to env vars if port_mapping is empty
-            if "filesystem" not in port_mapping:
-                port_mapping["filesystem"] = int(getenv("FILESYSTEM_MCP_PORT", "3333"))
-            if "media_tools" not in port_mapping:
-                port_mapping["media_tools"] = int(getenv("MEDIA_TOOLS_MCP_PORT", "4444"))
+            # Fallback to env vars only for servers the task actually requests.
+            default_port_env = {
+                "filesystem": ("FILESYSTEM_MCP_PORT", "3333"),
+                "playwright": ("PLAYWRIGHT_MCP_PORT", "3335"),
+                "media_tools": ("MEDIA_TOOLS_MCP_PORT", "4444"),
+                "google-search": ("GOOGLE_SEARCH_MCP_PORT", "3333"),
+            }
+            for server_name in requested_servers:
+                if server_name in port_mapping:
+                    continue
+                if server_name in default_port_env:
+                    env_key, default_val = default_port_env[server_name]
+                    port_mapping[server_name] = int(getenv(env_key, default_val))
 
-            gateway_port = port_mapping.get("filesystem", 3333)
-            gateway_url = f"http://127.0.0.1:{gateway_port}/filesystem/sse"
-            logger.info(f"Waiting for Gateway to be ready at {gateway_url}")
-            
-            max_retries = 30
-            for i in range(max_retries):
-                try:
-                    async with httpx.AsyncClient(timeout=3.0) as client:
-                        async with client.stream("GET", gateway_url) as response:
-                            if response.status_code == 200:
-                                logger.info(f"Gateway is ready after {i+1} attempts")
+            gateway_backed_servers = {"filesystem", "google-search"}
+            for server_name in sorted(requested_servers & gateway_backed_servers):
+                if server_name not in port_mapping:
+                    continue
+                gateway_port = port_mapping[server_name]
+                gateway_url = f"http://127.0.0.1:{gateway_port}/{server_name}/sse"
+                logger.info(f"Waiting for Gateway endpoint to be ready at {gateway_url}")
+
+                max_retries = 30
+                for i in range(max_retries):
+                    try:
+                        async with httpx.AsyncClient(timeout=3.0) as client:
+                            async with client.stream("GET", gateway_url) as response:
+                                if response.status_code == 200:
+                                    logger.info(
+                                        "Gateway endpoint %s is ready after %s attempts",
+                                        server_name,
+                                        i + 1,
+                                    )
+                                    await asyncio.sleep(0.5)
+                                    break
+                                logger.warning(
+                                    "Gateway endpoint %s returned status %s, retrying...",
+                                    server_name,
+                                    response.status_code,
+                                )
                                 await asyncio.sleep(0.5)
-                                break
-                            else:
-                                logger.warning(f"Gateway returned status {response.status_code}, retrying...")
-                except Exception as e:
-                    if i < max_retries - 1:
-                        logger.debug(f"Gateway health check attempt {i+1} failed: {e}, retrying...")
-                        await asyncio.sleep(0.5)
-                    else:
-                        logger.warning(f"Gateway health check failed after {max_retries} retries: {e}")
-                        break
+                    except Exception as e:
+                        if i < max_retries - 1:
+                            logger.debug(
+                                "Gateway endpoint %s health check attempt %s failed: %s, retrying...",
+                                server_name,
+                                i + 1,
+                                e,
+                            )
+                            await asyncio.sleep(0.5)
+                        else:
+                            logger.warning(
+                                "Gateway endpoint %s health check failed after %s retries: %s",
+                                server_name,
+                                max_retries,
+                                e,
+                            )
+
+            async def _wait_for_sse_server(server_name: str, url: str, max_retries: int = 30) -> None:
+                """Wait until a native SSE MCP endpoint responds with HTTP 200."""
+                logger.info(f"Waiting for {server_name} SSE to be ready at {url}")
+                for i in range(max_retries):
+                    try:
+                        async with httpx.AsyncClient(timeout=3.0) as client:
+                            async with client.stream("GET", url) as response:
+                                if response.status_code == 200:
+                                    logger.info(f"{server_name} SSE is ready after {i+1} attempts")
+                                    await asyncio.sleep(0.5)
+                                    return
+                                logger.warning(
+                                    f"{server_name} SSE returned status {response.status_code}, retrying..."
+                                )
+                                await asyncio.sleep(0.5)
+                    except Exception as e:
+                        if i < max_retries - 1:
+                            logger.debug(
+                                f"{server_name} SSE health check attempt {i+1} failed: {e}, retrying..."
+                            )
+                            await asyncio.sleep(0.5)
+                        else:
+                            logger.warning(
+                                f"{server_name} SSE health check failed after {max_retries} retries: {e}"
+                            )
+
+            if "playwright" in requested_servers and "playwright" in port_mapping:
+                await _wait_for_sse_server(
+                    "playwright",
+                    f"http://127.0.0.1:{port_mapping['playwright']}/sse",
+                )
+
+            if "media_tools" in requested_servers and "media_tools" in port_mapping:
+                await _wait_for_sse_server(
+                    "media_tools",
+                    f"http://127.0.0.1:{port_mapping['media_tools']}/sse",
+                )
 
             # Get volume mappings for path translation (container -> host)
             volume_mappings = env.get_volume_mappings()
@@ -206,6 +286,13 @@ class LiteRunner:
                         {"tool": "read_multiple_files", "action": "reject", "arguments": {}},
                     ]
 
+                # For stdio python servers, run with the current interpreter so
+                # venv-installed modules (e.g. mcpuniverse) are always available.
+                if transport == "stdio" and self._agent._mcp_manager:
+                    conf = self._agent._mcp_manager._server_configs.get(server_name)
+                    if conf and conf.stdio and conf.stdio.command in ("python", "python3"):
+                        conf.stdio.command = sys.executable
+
                 mcp_servers_with_transport.append(server_dict)
 
             # Update MCPManager with SSE addresses for containerized servers
@@ -215,9 +302,16 @@ class LiteRunner:
                     server_name = server_cfg.name
                     if server_name in port_mapping:
                         port = port_mapping[server_name]
-                        # For Gateway-based servers (filesystem), no direct sse_address needed
-                        # For native SSE servers (media_tools), set direct sse_address
+                        # For native SSE servers, set direct sse_address.
                         if server_name == "media_tools":
+                            sse_address = f"http://127.0.0.1:{port}/sse"
+                            existing_config = self._agent._mcp_manager._server_configs.get(server_name)
+                            if existing_config:
+                                existing_config.sse_address = sse_address
+                            else:
+                                new_config = ServerConfig(name=server_name, sse_address=sse_address)
+                                self._agent._mcp_manager._server_configs[server_name] = new_config
+                        elif server_name == "playwright":
                             sse_address = f"http://127.0.0.1:{port}/sse"
                             existing_config = self._agent._mcp_manager._server_configs.get(server_name)
                             if existing_config:

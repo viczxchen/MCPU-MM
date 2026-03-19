@@ -10,8 +10,8 @@ services:
     working_dir: /workspace
     volumes:
       # MCP-Universe and MCPU-MM for MCP servers
-      - ../../../MCP-Universe:/mcp-universe:ro
-      - ../..:/mcpu-mm:ro
+      - ../../../../MCP-Universe:/mcp-universe:ro
+      - ../../..:/mcpu-mm:ro
       # 挂载 inputs 目录（只读），这样改了 inputs 不需要重新 build
       - ./inputs:/inputs:ro
     environment:

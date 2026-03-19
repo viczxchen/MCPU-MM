@@ -1,0 +1,20 @@
+# MCPU-MM Task Configuration
+
+name: shopping_information
+category: offline_image_qa
+
+question: |
+  Is there a USB-A port in this product:
+  "Fast Charger for LG K51 Q70 Velvet 5G/V60,tylo 6 5X 4 5,G8 G8X G7 V40 V35 V50 Thinq,K92,Reflect,Samsung Galaxy A13 5G"?
+
+  Save your final answer to /workspace/answer.txt as either "Yes" or "No".
+
+output_format: {}
+
+mcp_servers:
+  - name: filesystem
+
+inputs:
+  images: []
+  videos: []
+  pdfs: []

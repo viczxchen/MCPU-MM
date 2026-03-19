@@ -1,0 +1,61 @@
+services:
+  task-env:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mcpu-mm-web-understanding:${MCPU_MM_TASK_NAME:-web-understanding}
+    container_name: mcpu-mm-web-understanding-${MCPU_MM_TASK_NAME:-web-understanding}
+    working_dir: /workspace
+    volumes:
+      - ../../../../MCP-Universe:/mcp-universe:ro
+      - ../../..:/mcpu-mm:ro
+      - ./inputs:/inputs:ro
+      - ./shared_screenshots:/shared
+    environment:
+      - PYTHONPATH=/mcp-universe:/mcpu-mm:/workspace
+      - FASTMCP_HOST=0.0.0.0
+    command:
+      - sh
+      - -c
+      - |
+        rm -rf /workspace/*
+        cp -r /inputs/. /workspace/
+        mkdir -p /shared
+
+        python3 -m http.server 18080 --directory /workspace &
+        cd /shared
+        python3 -m mcpuniverse.mcp.servers.media_tools --transport sse --port 4444 &
+        sleep infinity
+    ports:
+      - "${MEDIA_TOOLS_MCP_PORT:-4444}:4444"
+      - "${WEB_UNDERSTANDING_PORT:-18080}:18080"
+
+  playwright-mcp:
+    image: mcr.microsoft.com/playwright/mcp:latest
+    container_name: mcpu-mm-web-understanding-playwright-${MCPU_MM_TASK_NAME:-web-understanding}
+    user: "0:0"
+    entrypoint:
+      - node
+      - /app/cli.js
+      - --headless
+      - --browser
+      - chromium
+      - --no-sandbox
+    working_dir: /shared
+    volumes:
+      - ./shared_screenshots:/shared
+    command:
+      - --host
+      - 0.0.0.0
+      - --allowed-hosts
+      - "*"
+      - --port
+      - "3333"
+      - --viewport-size
+      - "1920x1080"
+      - --output-dir
+      - /shared
+    depends_on:
+      - task-env
+    ports:
+      - "${PLAYWRIGHT_MCP_PORT:-3333}:3333"

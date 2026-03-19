@@ -1,0 +1,28 @@
+# MCPU-MM Task Configuration
+
+name: web_understanding
+category: offline_image_qa
+
+question: |
+  I want to buy a DVD of Harry Potter and Sorcerer's Stone, with the sorting hat on its cover.
+  Please open the Amazon page with Playwright and find the exact price.
+
+  Requirements:
+  - Use Playwright to visit http://host.docker.internal:18080/amazon_sample.html
+  - Keep scrolling down the page (press page down) until the merchant that matches the description is found.
+  - Use screenshots and media_tools when needed to identify the correct product listing and its exact price.
+  - Return only the price as plain text.
+
+  Tips: Take a screenshot each time you scroll down the page, then use media_tools read_image/read_images to analyze what you captured.
+  Hint: about 5 times of page down will do.
+
+output_format: {}
+
+mcp_servers:
+  - name: playwright
+  - name: media_tools
+
+inputs:
+  images: []
+  videos: []
+  pdfs: []

@@ -20,13 +20,14 @@ MCPU-MM/
     runner.py             # LiteRunner：调度 Task + Agent + Env + evaluate
     mcp_config.py         # 构造 containerized MCP server 配置
   tasks/
-    image_filesystem/
-      task.yaml           # 统一的任务配置文件
-      Dockerfile          # 任务环境镜像
-      docker-compose.yaml # 容器定义
-      evaluate.py         # 自定义评估逻辑
-      solution.py         # 确定性解法，验证任务可解性
-      inputs/             # 初始数据
+    offline_image/
+      image_filesystem/
+        task.yaml           # 统一的任务配置文件
+        Dockerfile          # 任务环境镜像
+        docker-compose.yaml # 容器定义
+        evaluate.py         # 自定义评估逻辑
+        solution.py         # 确定性解法，验证任务可解性
+        inputs/             # 初始数据
 ```
 
 ---
@@ -100,7 +101,17 @@ python run_demo_mm.py
 
 ```bash
 cd MCPU-MM
-python tasks/image_filesystem/solution.py
+python tasks/offline_image/image_filesystem/solution.py
 ```
 预期：终端输出 `Passed: True`。
+
+## TODO
+
+- multimodal llm, agent workflow
+- 
+
+1. sample task容器化迁移 + 测试
+2. 难度定级: gpt4o通过详细指示能够完成(medium)
+3. 数据生成：必须可完成
+
 

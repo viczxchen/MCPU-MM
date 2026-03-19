@@ -1,0 +1,26 @@
+# MCPU-MM Task Configuration
+
+name: complex_reasoning
+category: online_image_qa
+
+question: |
+  You are given one image and a multi-hop question that cannot be solved from the image alone.
+  Use online search to gather evidence and reason step by step before answering.
+
+  Requirements:
+  - Inspect the image with media_tools and extract key clues.
+  - Use Playwright and google-search for at least two evidence-gathering hops.
+  - Return only the final answer text.
+
+output_format: {}
+
+mcp_servers:
+  - name: playwright
+  - name: google-search
+  - name: media_tools
+
+inputs:
+  images:
+    - inputs/66ea857b6b8edd4f56302c06_rationale.png
+  videos: []
+  pdfs: []

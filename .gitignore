@@ -7,3 +7,5 @@ venv/
 *.egg-info/
 .DS_Store
 *.log
+logs/
+tasks/offline_image/web_understanding/shared_screenshots/

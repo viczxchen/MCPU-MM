@@ -97,6 +97,7 @@ class TaskEnv:
             "-p",
             self.name,
             "up",
+            "--build",
             "-d",
         ]
         self._logger.debug("Running: %s", " ".join(cmd))
@@ -208,6 +209,10 @@ class TaskEnv:
                     def replace_env(match):
                         var_name = match.group(1)
                         default = match.group(2) if match.group(2) else ""
+                        # Keep compose/runtime naming consistent: prefer current task name
+                        # when container_name uses ${MCPU_MM_TASK_NAME:-...}.
+                        if var_name == "MCPU_MM_TASK_NAME":
+                            return self.name
                         return os.environ.get(var_name, default)
                     
                     container_name = re.sub(
