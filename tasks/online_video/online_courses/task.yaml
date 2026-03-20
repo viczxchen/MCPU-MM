@@ -1,0 +1,37 @@
+# MCPU-MM Task Configuration
+
+name: online_courses
+category: online_video_qa
+
+question: |
+  In the section about CLIP in this video, what are the titles of the two papers
+  shown at the beginning of that section?
+
+  Video URL:
+  - https://www.youtube.com/watch?v=iv-5mZ_9CPY
+
+  Requirements:
+  - Use YouTube Toolbox to locate the CLIP-related segment from transcript/content.
+  - Use Playwright to verify visible titles if needed.
+  - Return ONLY JSON (no markdown/code fence) in this exact shape:
+    {"title":["...","..."]}
+
+output_format:
+  type: object
+  properties:
+    title:
+      type: array
+      items:
+        type: string
+  required:
+    - title
+
+mcp_servers:
+  - name: playwright
+  - name: youtube-toolbox
+  - name: media_tools
+
+inputs:
+  images: []
+  videos: []
+  pdfs: []

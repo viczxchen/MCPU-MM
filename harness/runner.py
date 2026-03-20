@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Set
 import sys
+from urllib.parse import unquote, urlparse
 
 from mcpuniverse.agent.base import BaseAgent
 from mcpuniverse.common.context import Context
@@ -36,6 +38,80 @@ class LiteRunner:
     # ------------------------------------------------------------------ #
     # Private helper methods
     # ------------------------------------------------------------------ #
+
+    def _build_runtime_prompt_suffix(self, spec: LiteTaskSpec, requested_servers: set[str]) -> str:
+        """Add execution-time guardrails for unstable tool patterns.
+
+        Temporary test-stage workaround: this prompt suffix is used to reduce
+        flaky timeouts in online video runs (especially Playwright tool calls).
+        It should be treated as a stopgap patch and can be relaxed/reworked
+        once timeout handling is fixed at the tool/runtime level.
+        """
+        is_online_video = spec.category.startswith("online_video")
+        has_video_stack = {"playwright", "youtube-toolbox"}.issubset(requested_servers)
+        if not (is_online_video or has_video_stack):
+            return ""
+
+        return (
+            "\n\nExecution constraints (must follow):\n"
+            "- Do NOT call browser_install.\n"
+            "- Do NOT use browser_run_code for long waits.\n"
+            "- Never call waitForTimeout >= 10000 ms in browser_run_code.\n"
+            "- Prefer browser_wait_for / browser_snapshot / browser_take_screenshot over custom sleep loops.\n"
+            "- If you need to seek video time, set currentTime quickly and return immediately.\n"
+            "- Keep each browser_run_code call short (<8 seconds).\n"
+        )
+
+    def _rewrite_file_urls_for_playwright_pdf_http(
+        self, question: str, requested_servers: Set[str]
+    ) -> str:
+        """Rewrite Playwright-oriented ``file://`` URLs to internal HTTP URLs.
+
+        Playwright MCP blocks ``file://``. Task compose serves PDFs from ``/shared`` via
+        ``http://<service>:<port>/<basename>`` inside the Docker network. Authors can write
+        ``file:///workspace/foo.pdf`` (or ``file:///shared/foo.pdf``) in ``task.yaml``; when
+        ``playwright`` is among requested servers, expand to the stable in-network URL so
+        ``task.yaml`` does not hardcode ``http://task-env:18080/...``.
+
+        Override host/port with ``MCPU_MM_PDF_HTTP_HOST`` / ``MCPU_MM_PDF_HTTP_INTERNAL_PORT``
+        (defaults: ``task-env``, ``18080``). Host-side ``PDF_HTTP_PORT`` only remaps the
+        published port; inside the stack the listener stays on ``18080`` unless you change
+        compose and the env var together.
+        """
+        if "playwright" not in requested_servers:
+            return question
+
+        import os
+        import logging
+
+        logger = logging.getLogger(self.__class__.__name__)
+        host = os.getenv("MCPU_MM_PDF_HTTP_HOST", "task-env")
+        port = os.getenv("MCPU_MM_PDF_HTTP_INTERNAL_PORT", os.getenv("PDF_HTTP_INTERNAL_PORT", "18080"))
+
+        def substitute(match: re.Match) -> str:
+            url = match.group(0)
+            try:
+                parsed = urlparse(url)
+                if parsed.scheme != "file":
+                    return url
+                path = unquote(parsed.path)
+            except Exception:
+                return url
+            if path.startswith("/workspace/") or path.startswith("/shared/"):
+                name = Path(path).name
+                if not name:
+                    return url
+                return f"http://{host}:{port}/{name}"
+            return url
+
+        rewritten = re.sub(r"file://[^\s\"'<>]+", substitute, question, flags=re.IGNORECASE)
+        if rewritten != question:
+            logger.info(
+                "Rewrote file:// PDF URLs for Playwright to http://%s:%s/… (see _rewrite_file_urls_for_playwright_pdf_http)",
+                host,
+                port,
+            )
+        return rewritten
 
     async def _run_custom_evaluation(
         self,
@@ -148,6 +224,8 @@ class LiteRunner:
             # Get task info directly from spec (no longer need BenchmarkTask)
             question = spec.question
             output_format = spec.output_format
+            requested_servers = {cfg.name for cfg in spec.mcp_servers}
+            question = self._rewrite_file_urls_for_playwright_pdf_http(question, requested_servers)
             logger.info(f"Task question length: {len(question)} chars")
 
             # Container name for evaluation
@@ -156,7 +234,7 @@ class LiteRunner:
 
             # Get MCP server port mappings
             port_mapping = env.get_mcp_server_ports()
-            requested_servers = {cfg.name for cfg in spec.mcp_servers}
+            question = question + self._build_runtime_prompt_suffix(spec, requested_servers)
             
             # Wait for Gateway to be ready (if using containerized servers)
             import asyncio
@@ -164,20 +242,42 @@ class LiteRunner:
             from os import getenv
             
             # Fallback to env vars only for servers the task actually requests.
+            # Gateway bridges multiple stdio servers on one host port; compose may publish it as
+            # GOOGLE_SEARCH_MCP_PORT (e.g. pdf scholar tasks, online_video/search_qa) or FILESYSTEM_MCP_PORT.
+            def _gateway_stdio_host_port() -> int:
+                return int(
+                    getenv("GOOGLE_SEARCH_MCP_PORT")
+                    or getenv("FILESYSTEM_MCP_PORT")
+                    or "3333"
+                )
+
             default_port_env = {
                 "filesystem": ("FILESYSTEM_MCP_PORT", "3333"),
                 "playwright": ("PLAYWRIGHT_MCP_PORT", "3335"),
                 "media_tools": ("MEDIA_TOOLS_MCP_PORT", "4444"),
                 "google-search": ("GOOGLE_SEARCH_MCP_PORT", "3333"),
+                "pdf-reader-mcp": ("FILESYSTEM_MCP_PORT", "3333"),
+                "arxiv-mcp-server": ("FILESYSTEM_MCP_PORT", "3333"),
+                "youtube-toolbox": ("YOUTUBE_TOOLBOX_MCP_PORT", "3336"),
+                "serper": ("SERPER_MCP_PORT", "3337"),
+                "video-editing": ("VIDEO_EDITING_MCP_PORT", "4455"),
             }
             for server_name in requested_servers:
                 if server_name in port_mapping:
+                    continue
+                if server_name in {"pdf-reader-mcp", "arxiv-mcp-server"}:
+                    port_mapping[server_name] = _gateway_stdio_host_port()
                     continue
                 if server_name in default_port_env:
                     env_key, default_val = default_port_env[server_name]
                     port_mapping[server_name] = int(getenv(env_key, default_val))
 
-            gateway_backed_servers = {"filesystem", "google-search"}
+            gateway_backed_servers = {
+                "filesystem",
+                "google-search",
+                "pdf-reader-mcp",
+                "arxiv-mcp-server",
+            }
             for server_name in sorted(requested_servers & gateway_backed_servers):
                 if server_name not in port_mapping:
                     continue
@@ -259,14 +359,35 @@ class LiteRunner:
                     f"http://127.0.0.1:{port_mapping['media_tools']}/sse",
                 )
 
+            if "youtube-toolbox" in requested_servers and "youtube-toolbox" in port_mapping:
+                await _wait_for_sse_server(
+                    "youtube-toolbox",
+                    f"http://127.0.0.1:{port_mapping['youtube-toolbox']}/sse",
+                )
+
+            if "serper" in requested_servers and "serper" in port_mapping:
+                await _wait_for_sse_server(
+                    "serper",
+                    f"http://127.0.0.1:{port_mapping['serper']}/sse",
+                )
+
+            if "video-editing" in requested_servers and "video-editing" in port_mapping:
+                await _wait_for_sse_server(
+                    "video-editing",
+                    f"http://127.0.0.1:{port_mapping['video-editing']}/sse",
+                )
+
             # Get volume mappings for path translation (container -> host)
             volume_mappings = env.get_volume_mappings()
 
-            # Add /workspace -> task_dir/inputs mapping for image path translation
+            # Map container /workspace -> host dir for file:// -> data URI (OpenAI path normalization).
+            # Prefer shared_workspace when present (runtime outputs + seeds copied at container start).
             if "/workspace" not in volume_mappings:
-                host_workspace = task_dir / "inputs"
-                if host_workspace.exists():
-                    volume_mappings["/workspace"] = str(host_workspace.resolve())
+                for candidate in ("shared_workspace", "inputs"):
+                    host_workspace = task_dir / candidate
+                    if host_workspace.exists():
+                        volume_mappings["/workspace"] = str(host_workspace.resolve())
+                        break
             
             # Build MCP server configs for containerized servers
             mcp_servers_with_transport = []
@@ -279,8 +400,10 @@ class LiteRunner:
                     "transport": transport,
                 }
 
-                # For filesystem, deny tools that should use media_tools instead
-                if server_name == "filesystem":
+                # For filesystem, deny direct media reads when media_tools is present so the
+                # agent uses media_tools (read_image/watch_video) for vision; all MCPU-MM
+                # tasks are expected to list media_tools.
+                if server_name == "filesystem" and "media_tools" in requested_servers:
                     server_dict["permissions"] = [
                         {"tool": "read_media_file", "action": "reject", "arguments": {}},
                         {"tool": "read_multiple_files", "action": "reject", "arguments": {}},
@@ -303,22 +426,15 @@ class LiteRunner:
                     if server_name in port_mapping:
                         port = port_mapping[server_name]
                         # For native SSE servers, set direct sse_address.
-                        if server_name == "media_tools":
-                            sse_address = f"http://127.0.0.1:{port}/sse"
-                            existing_config = self._agent._mcp_manager._server_configs.get(server_name)
-                            if existing_config:
-                                existing_config.sse_address = sse_address
-                            else:
-                                new_config = ServerConfig(name=server_name, sse_address=sse_address)
-                                self._agent._mcp_manager._server_configs[server_name] = new_config
-                        elif server_name == "playwright":
-                            sse_address = f"http://127.0.0.1:{port}/sse"
-                            existing_config = self._agent._mcp_manager._server_configs.get(server_name)
-                            if existing_config:
-                                existing_config.sse_address = sse_address
-                            else:
-                                new_config = ServerConfig(name=server_name, sse_address=sse_address)
-                                self._agent._mcp_manager._server_configs[server_name] = new_config
+                        if server_name in gateway_backed_servers:
+                            continue
+                        sse_address = f"http://127.0.0.1:{port}/sse"
+                        existing_config = self._agent._mcp_manager._server_configs.get(server_name)
+                        if existing_config:
+                            existing_config.sse_address = sse_address
+                        else:
+                            new_config = ServerConfig(sse_address=sse_address)
+                            self._agent._mcp_manager._server_configs[server_name] = new_config
             
             # Set container path mapping in agent's context
             if volume_mappings:

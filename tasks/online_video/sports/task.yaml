@@ -1,0 +1,38 @@
+# MCPU-MM Task Configuration
+
+name: sports
+category: online_video_qa
+
+question: |
+  Please open this YouTube video, skip ads if they appear, and jump to around 28:30.
+  Then answer: what is the first-set score, and who won that set?
+
+  Video URL:
+  - https://www.youtube.com/watch?v=jOtDhq0erTg
+
+  Requirements:
+  - Use YouTube Toolbox to fetch transcript/video metadata first.
+  - Use Playwright to verify the scene near 28:30 when needed.
+  - Return ONLY JSON (no markdown/code fence) in this exact shape:
+    {"score":"...","winner":"..."}
+
+output_format:
+  type: object
+  properties:
+    score:
+      type: string
+    winner:
+      type: string
+  required:
+    - score
+    - winner
+
+mcp_servers:
+  - name: playwright
+  - name: youtube-toolbox
+  - name: media_tools
+
+inputs:
+  images: []
+  videos: []
+  pdfs: []

@@ -1,0 +1,35 @@
+# MCPU-MM Task Configuration
+
+name: citation_verification
+category: pdf_scholar_search
+
+question: |
+  Check whether the citations in this article actually exist.
+
+  The PDF is copied to `/workspace/citation_sample.pdf`.
+
+  **pdf-reader-mcp** (`display_pdf`, `read_pdf_bytes`, etc.): use the **local path**
+  `/workspace/citation_sample.pdf` only. The PDF server rejects non-HTTPS remote URLs, so do **not**
+  pass `http://task-env:18080/...` to pdf-reader tools.
+
+  **Playwright** (browser only): **`browser_navigate`** to `file:///workspace/citation_sample.pdf`.
+
+  Return ONLY a JSON object with:
+  - "all_exist": boolean (true or false)
+  - "title": string (paper title you are checking, or the key citation title referenced in the task)
+
+output_format:
+  type: json
+
+mcp_servers:
+  - name: playwright
+  - name: google-search
+  - name: pdf-reader-mcp
+  - name: arxiv-mcp-server
+  - name: media_tools
+
+inputs:
+  images: []
+  videos: []
+  pdfs:
+    - inputs/citation_sample.pdf

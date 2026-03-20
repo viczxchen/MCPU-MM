@@ -1,0 +1,29 @@
+# MCPU-MM Task Configuration
+
+name: content_verification
+category: pdf_understanding
+
+question: |
+  Please verify the correspondence between the data on this PDF page and the descriptions in the text.
+  Should any inconsistencies be found, identify the erroneous statements and provide corrected values.
+
+  The PDF is at `/workspace/Sample_Auto_Arena.pdf`.
+
+  Return ONLY a JSON object with keys:
+  - "Result": string (e.g. "Correct" or "Incorrect")
+  - "Reason": string (brief explanation / the inconsistent value you found)
+  - "Correction": string (corrected value)
+
+output_format:
+  type: json
+
+mcp_servers:
+  - name: playwright
+  - name: pdf-reader-mcp
+  - name: media_tools
+
+inputs:
+  images: []
+  videos: []
+  pdfs:
+    - inputs/Sample_Auto_Arena.pdf

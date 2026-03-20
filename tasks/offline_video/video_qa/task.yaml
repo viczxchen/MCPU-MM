@@ -1,0 +1,42 @@
+# MCPU-MM Task Configuration
+
+name: video_qa
+category: offline_video_qa
+
+question: |
+  Please watch the local video and answer the question about the speaker's slide titles.
+
+  Task:
+  - Open `/workspace/12_Predictions_TED.mp4` (seeded from task inputs at container start)
+  - Identify the exact titles of the first three predictions shown on slides
+  - Return ONLY JSON (no markdown/code fence) in this exact shape:
+    {"prediction 1":"...","prediction 2":"...","prediction 3":"..."}
+
+  Use `video-editing` for `get_frame` / `get_info` as needed, then use **media_tools**
+  (`read_image` / `read_images` / `watch_video`) to inspect visuals — do not use
+  filesystem `read_media_file` / `read_text_file` on images or video.
+
+output_format:
+  type: object
+  properties:
+    prediction 1:
+      type: string
+    prediction 2:
+      type: string
+    prediction 3:
+      type: string
+  required:
+    - prediction 1
+    - prediction 2
+    - prediction 3
+
+mcp_servers:
+  - name: filesystem
+  - name: media_tools
+  - name: video-editing
+
+inputs:
+  images: []
+  videos:
+    - inputs/12_Predictions_TED.mp4
+  pdfs: []

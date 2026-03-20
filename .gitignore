@@ -8,4 +8,6 @@ venv/
 .DS_Store
 *.log
 logs/
-tasks/offline_image/web_understanding/shared_screenshots/
+# Runtime screenshots / Playwright output (per-task dirs)
+tasks/**/shared_screenshots/
+playwright/.auth/

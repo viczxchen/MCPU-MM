@@ -1,0 +1,27 @@
+# MCPU-MM Task Configuration
+
+name: paper_search
+category: pdf_scholar_search
+
+question: |
+  Please help me find an arXiv article from *Alibaba Tongyi Lab* on Multimodal Deep Research Agent,
+  published around August 2025. Show me the article's title and the corresponding author's name.
+
+  Use google-search and arxiv tools as needed. Return ONLY a JSON object (no extra prose) with keys:
+  - "title": string
+  - "corresponding author": array of author name strings
+
+output_format:
+  type: json
+
+mcp_servers:
+  - name: playwright
+  - name: google-search
+  - name: pdf-reader-mcp
+  - name: arxiv-mcp-server
+  - name: media_tools
+
+inputs:
+  images: []
+  videos: []
+  pdfs: []

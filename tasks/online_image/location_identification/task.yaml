@@ -11,10 +11,22 @@ question: |
   - Use media_tools to inspect the image details first.
   - Use Playwright and google-search to gather evidence from the web.
   - Public image URL (for tools that require image_url): https://cdn.jsdelivr.net/gh/viczxchen/MCPU-MM@f20b19952a24f80150b8a9aea3fd06c508c3285a/tasks/online_image/location_identification/inputs/WechatIMG158.jpg
-  - Return only one final answer in this format:
-    "<country>, <city>, <landmark_or_place_name>"
+  - Return ONLY JSON (no markdown/code fence) in this exact shape:
+    {"Country":"...","City":"...","Location":"..."}
 
-output_format: {}
+output_format:
+  type: object
+  properties:
+    Country:
+      type: string
+    City:
+      type: string
+    Location:
+      type: string
+  required:
+    - Country
+    - City
+    - Location
 
 mcp_servers:
   - name: playwright

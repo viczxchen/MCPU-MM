@@ -1,0 +1,80 @@
+services:
+  task-env:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mcpu-mm-pdf-chart-comprehension:${MCPU_MM_TASK_NAME:-chart_comprehension}
+    container_name: mcpu-mm-pdf-chart-comprehension-${MCPU_MM_TASK_NAME:-chart_comprehension}
+    working_dir: /workspace
+    volumes:
+      - ../../../../../MCP-Universe:/mcp-universe:ro
+      - ../../../../:/mcpu-mm:ro
+      - ./inputs:/inputs:ro
+      - ./shared_screenshots:/shared
+    environment:
+      - PYTHONPATH=/mcp-universe:/mcpu-mm:/workspace
+      - FASTMCP_HOST=0.0.0.0
+      - HTTP_PROXY=${MCPU_MM_HTTP_PROXY:-http://host.docker.internal:7890}
+      - HTTPS_PROXY=${MCPU_MM_HTTPS_PROXY:-http://host.docker.internal:7890}
+      - ALL_PROXY=${MCPU_MM_ALL_PROXY:-socks5://host.docker.internal:7890}
+      - NO_PROXY=${MCPU_MM_NO_PROXY:-localhost,127.0.0.1,host.docker.internal},task-env
+    command:
+      - sh
+      - -c
+      - |
+        rm -rf /workspace/*
+        cp -r /inputs/. /workspace/
+        mkdir -p /shared
+        # Playwright MCP runs in a separate container: only /shared is shared with it.
+        # Copy PDFs here; Playwright MCP blocks file:// — serve over HTTP for browser_navigate.
+        for f in /workspace/*.pdf; do
+          [ -f "$$f" ] && cp -f "$$f" /shared/
+        done
+        python3 -m http.server 18080 --directory /shared --bind 0.0.0.0 &
+        python3 -m mcpuniverse.mcp.gateway \
+          --port 3333 \
+          --config /mcp-universe/mcpuniverse/mcp/configs/server_list.json \
+          --mode stdio \
+          --servers pdf-reader-mcp &
+        cd /shared
+        python3 -m mcpuniverse.mcp.servers.media_tools --transport sse --port 4444 &
+        sleep infinity
+    ports:
+      - "${FILESYSTEM_MCP_PORT:-3333}:3333"
+      - "${MEDIA_TOOLS_MCP_PORT:-4444}:4444"
+      - "${PDF_HTTP_PORT:-18080}:18080"
+
+  playwright-mcp:
+    image: mcr.microsoft.com/playwright/mcp:latest
+    container_name: mcpu-mm-pdf-chart-comprehension-playwright-${MCPU_MM_TASK_NAME:-chart_comprehension}
+    user: "0:0"
+    entrypoint:
+      - node
+      - /app/cli.js
+      - --headless
+      - --browser
+      - chromium
+      - --no-sandbox
+    working_dir: /shared
+    volumes:
+      - ./shared_screenshots:/shared
+    environment:
+      - HTTP_PROXY=${MCPU_MM_HTTP_PROXY:-http://host.docker.internal:7890}
+      - HTTPS_PROXY=${MCPU_MM_HTTPS_PROXY:-http://host.docker.internal:7890}
+      - ALL_PROXY=${MCPU_MM_ALL_PROXY:-socks5://host.docker.internal:7890}
+      - NO_PROXY=${MCPU_MM_NO_PROXY:-localhost,127.0.0.1,host.docker.internal},task-env
+    command:
+      - --host
+      - 0.0.0.0
+      - --allowed-hosts
+      - "*"
+      - --port
+      - "3335"
+      - --viewport-size
+      - "1920x1080"
+      - --output-dir
+      - /shared
+    depends_on:
+      - task-env
+    ports:
+      - "${PLAYWRIGHT_MCP_PORT:-3335}:3335"

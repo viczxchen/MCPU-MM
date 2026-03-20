@@ -1,0 +1,38 @@
+# MCPU-MM Task Configuration
+
+name: video_editing
+category: offline_video_operation
+
+question: |
+  This video is the ending of *The Truman Show*.
+  Please extract the single-person shot where Truman says:
+  "In case I don't see you, good afternoon, good evening, and good night!"
+
+  Requirements:
+  - Source video: `/workspace/The_Truman_Show.mp4`
+  - Hint: this segment starts around 3:39
+  - Save the final clip as `truman_single_person.mp4` in `/workspace`
+  - Return ONLY JSON (no markdown/code fence) in this shape:
+    {"output_file":"truman_single_person.mp4"}
+
+  If you need to verify frames visually, use **media_tools** (`read_image` / `watch_video`);
+  do not use filesystem `read_media_file` on images or video.
+
+output_format:
+  type: object
+  properties:
+    output_file:
+      type: string
+  required:
+    - output_file
+
+mcp_servers:
+  - name: filesystem
+  - name: media_tools
+  - name: video-editing
+
+inputs:
+  images: []
+  videos:
+    - inputs/The_Truman_Show.mp4
+  pdfs: []

@@ -1,0 +1,96 @@
+services:
+  task-env:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mcpu-mm-online-video-search-qa:${MCPU_MM_TASK_NAME:-online-video-search-qa}
+    container_name: mcpu-mm-online-video-search-qa-${MCPU_MM_TASK_NAME:-online-video-search-qa}
+    working_dir: /workspace
+    volumes:
+      - ../../../../MCP-Universe:/mcp-universe:ro
+      - ../../..:/mcpu-mm:ro
+      - ../../../../.youtube-toolbox-mcp:/youtube-toolbox-src:ro
+      - ./inputs:/inputs:ro
+      - ./shared_screenshots:/shared
+      - ../../../playwright/.auth:/auth:ro
+    environment:
+      - PYTHONPATH=/mcp-universe:/mcpu-mm:/workspace
+      - FASTMCP_HOST=0.0.0.0
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
+      - SERP_API_KEY=${SERP_API_KEY:-}
+      - HTTP_PROXY=${MCPU_MM_HTTP_PROXY:-http://host.docker.internal:7890}
+      - HTTPS_PROXY=${MCPU_MM_HTTPS_PROXY:-http://host.docker.internal:7890}
+      - ALL_PROXY=${MCPU_MM_ALL_PROXY:-socks5://host.docker.internal:7890}
+      - NO_PROXY=${MCPU_MM_NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
+    command:
+      - sh
+      - -c
+      - |
+        rm -rf /workspace/*
+        cp -r /inputs/. /workspace/
+        mkdir -p /shared /tmp/youtube-toolbox
+        cp -r /youtube-toolbox-src/. /tmp/youtube-toolbox/
+        python3 -m mcpuniverse.mcp.gateway \
+          --port 3333 \
+          --config /mcp-universe/mcpuniverse/mcp/configs/server_list.json \
+          --mode stdio \
+          --servers google-search &
+        cd /shared
+        python3 -m mcpuniverse.mcp.servers.media_tools --transport sse --port 4444 &
+        cd /tmp/youtube-toolbox
+        FASTMCP_PORT=3336 FASTMCP_HOST=0.0.0.0 python3 - <<'PY' &
+        import importlib.util
+        from pathlib import Path
+
+        server_path = Path("/tmp/youtube-toolbox/server.py")
+        spec = importlib.util.spec_from_file_location("youtube_toolbox_server", server_path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"Failed to load YouTube Toolbox from {server_path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.mcp.run("sse")
+        PY
+        sleep infinity
+    ports:
+      - "${GOOGLE_SEARCH_MCP_PORT:-3333}:3333"
+      - "${YOUTUBE_TOOLBOX_MCP_PORT:-3336}:3336"
+      - "${MEDIA_TOOLS_MCP_PORT:-4444}:4444"
+
+  playwright-mcp:
+    image: mcr.microsoft.com/playwright/mcp:latest
+    container_name: mcpu-mm-online-video-search-qa-playwright-${MCPU_MM_TASK_NAME:-online-video-search-qa}
+    user: "0:0"
+    entrypoint:
+      - node
+      - /app/cli.js
+      - --headless
+      - --browser
+      - chromium
+      - --no-sandbox
+    working_dir: /shared
+    volumes:
+      - ./shared_screenshots:/shared
+      - ../../../playwright/.auth:/auth:ro
+    environment:
+      - HTTP_PROXY=${MCPU_MM_HTTP_PROXY:-http://host.docker.internal:7890}
+      - HTTPS_PROXY=${MCPU_MM_HTTPS_PROXY:-http://host.docker.internal:7890}
+      - ALL_PROXY=${MCPU_MM_ALL_PROXY:-socks5://host.docker.internal:7890}
+      - NO_PROXY=${MCPU_MM_NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
+    command:
+      - --host
+      - 0.0.0.0
+      - --allowed-hosts
+      - "*"
+      - --port
+      - "3335"
+      - --viewport-size
+      - "1920x1080"
+      - --output-dir
+      - /shared
+      - --isolated
+      - --storage-state
+      - /auth/youtube.json
+    depends_on:
+      - task-env
+    ports:
+      - "${PLAYWRIGHT_MCP_PORT:-3335}:3335"

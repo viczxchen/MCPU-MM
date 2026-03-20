@@ -5,6 +5,7 @@ click-plugins==1.1.1.2
 click-repl==0.3.0
 httpx==0.28.1
 httpx-sse==0.4.1
+socksio
 mcp==1.9.4
 sse-starlette==3.0.2
 starlette==0.46.2

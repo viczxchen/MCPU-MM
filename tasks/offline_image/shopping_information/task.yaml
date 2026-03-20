@@ -13,6 +13,7 @@ output_format: {}
 
 mcp_servers:
   - name: filesystem
+  - name: media_tools
 
 inputs:
   images: []

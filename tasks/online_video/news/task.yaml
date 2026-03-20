@@ -1,0 +1,46 @@
+# MCPU-MM Task Configuration
+
+name: news
+category: online_video_qa
+
+question: |
+  In this BBC news report, there is a section about what people around the world eat for breakfast.
+  In that section:
+  1) Which city is the first interviewed woman from?
+  2) What does she eat for breakfast?
+  3) What specific ingredients are included?
+
+  Video URL:
+  - https://www.youtube.com/watch?v=YHITn1yAH_M
+
+  Requirements:
+  - Use YouTube Toolbox to retrieve transcript and video context first.
+  - Use Playwright for visual/timepoint verification if needed.
+  - Return ONLY JSON (no markdown/code fence) in this exact shape:
+    {"City":"...","Food":"...","What's in it?":["..."]}
+
+output_format:
+  type: object
+  properties:
+    City:
+      type: string
+    Food:
+      type: string
+    What's in it?:
+      type: array
+      items:
+        type: string
+  required:
+    - City
+    - Food
+    - What's in it?
+
+mcp_servers:
+  - name: playwright
+  - name: youtube-toolbox
+  - name: media_tools
+
+inputs:
+  images: []
+  videos: []
+  pdfs: []

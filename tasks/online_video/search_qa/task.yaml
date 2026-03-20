@@ -1,0 +1,38 @@
+# MCPU-MM Task Configuration
+
+name: search_qa
+category: online_video_search_qa
+
+question: |
+  Help me find "Stanford CS224N Spring 2024 Lecture 2" on YouTube.
+  I need the course-organization information from that lecture:
+  1) What are the instructor office hours?
+  2) How do students book the office hour?
+
+  Requirements:
+  - Use google-search and/or YouTube Toolbox to locate the correct lecture video.
+  - Use YouTube Toolbox transcript/details and Playwright page verification before answering.
+  - Return ONLY JSON (no markdown/code fence) in this exact shape:
+    {"Office Hour":"...","Book via":"..."}
+
+output_format:
+  type: object
+  properties:
+    Office Hour:
+      type: string
+    Book via:
+      type: string
+  required:
+    - Office Hour
+    - Book via
+
+mcp_servers:
+  - name: playwright
+  - name: youtube-toolbox
+  - name: google-search
+  - name: media_tools
+
+inputs:
+  images: []
+  videos: []
+  pdfs: []

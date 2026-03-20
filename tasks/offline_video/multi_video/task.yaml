@@ -1,0 +1,39 @@
+# MCPU-MM Task Configuration
+
+name: multi_video
+category: offline_video_operation
+
+question: |
+  In `/workspace/BCS_video/`, find the Better Call Saul Season 5 promo video that matches:
+  - Landscape orientation
+  - Gustavo Fring (Black man with glasses)
+  - Yellow background
+  - Content about how to iron a shirt
+
+  Then copy it and rename the copied file to:
+  `Gustavo_How_to_Iron_a_Shirt.mp4`
+
+  Save the new file under `/workspace` and return ONLY JSON (no markdown/code fence):
+  {"output_file":"Gustavo_How_to_Iron_a_Shirt.mp4"}
+
+  Use **media_tools** (`read_image` / `watch_video`) to compare candidates; do not use
+  filesystem `read_media_file` on video or images.
+
+output_format:
+  type: object
+  properties:
+    output_file:
+      type: string
+  required:
+    - output_file
+
+mcp_servers:
+  - name: filesystem
+  - name: media_tools
+  - name: video-editing
+
+inputs:
+  images: []
+  videos:
+    - inputs/BCS_video/*.mp4
+  pdfs: []

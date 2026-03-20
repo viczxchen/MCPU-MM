@@ -1,0 +1,35 @@
+# MCPU-MM Task Configuration
+
+name: chart_comprehension
+category: pdf_understanding
+
+question: |
+  In the LLM-as-a-Judge guideline settings of Figure 3, which Judge ranks Gemini 2 the lowest?
+
+  Files:
+  - `/workspace/chart_sample.pdf` for **pdf-reader-mcp** (path or `file:///workspace/chart_sample.pdf`).
+  - The same PDF is copied to `/shared/chart_sample.pdf` inside the Playwright container.
+
+  **Playwright:** **`browser_navigate`** to `file:///workspace/chart_sample.pdf`.
+  The PDF viewer often yields an **empty accessibility snapshot** — that is normal. You must then:
+  1. **`browser_take_screenshot`** (save PNG under `/shared/`, e.g. `/shared/fig.png`), and
+  2. **`read_image`** (media_tools) on that PNG path so the vision model can read the chart.
+
+  Relying only on `browser_snapshot` text is insufficient for figures.
+
+  Return ONLY the judge label as a single line of text (exact string match expected), e.g. the model name
+  as shown in the figure.
+
+output_format:
+  type: string
+
+mcp_servers:
+  - name: playwright
+  - name: pdf-reader-mcp
+  - name: media_tools
+
+inputs:
+  images: []
+  videos: []
+  pdfs:
+    - inputs/chart_sample.pdf

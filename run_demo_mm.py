@@ -61,8 +61,12 @@ def _load_env_file(env_path: Path) -> None:
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip()
-        # Do not override already-exported environment variables
-        os.environ.setdefault(key, value)
+        # Keep existing behavior for most variables, but force OPENAI_* from .env
+        # to avoid stale shell exports overriding model/base_url/api_key unexpectedly.
+        if key.startswith("OPENAI_"):
+            os.environ[key] = value
+        else:
+            os.environ.setdefault(key, value)
 
 
 def _resolve_demo_task_name(cli_task: str | None = None) -> str:
@@ -164,8 +168,14 @@ async def main(task_name: str) -> None:
 
     # For this local demo, ALWAYS force Gateway to point to the local container,
     # even if用户在终端里提前导出了 MCP_GATEWAY_ADDRESS（避免连到错误的地址）。
-    filesystem_port = os.environ.get("FILESYSTEM_MCP_PORT", "3333")
-    os.environ["MCP_GATEWAY_ADDRESS"] = f"http://127.0.0.1:{filesystem_port}"
+    # Prefer GOOGLE_SEARCH_MCP_PORT when set (same mapping as online_video/search_qa & pdf scholar tasks),
+    # else FILESYSTEM_MCP_PORT (gateway-backed stdio servers share this host port by default).
+    gateway_port = (
+        os.environ.get("GOOGLE_SEARCH_MCP_PORT")
+        or os.environ.get("FILESYSTEM_MCP_PORT")
+        or "3333"
+    )
+    os.environ["MCP_GATEWAY_ADDRESS"] = f"http://127.0.0.1:{gateway_port}"
     _ensure_local_no_proxy()
 
     # 2. Load LiteTaskSpec from task.yaml
@@ -177,8 +187,8 @@ async def main(task_name: str) -> None:
     mcp_manager = MCPManager(context=context)
 
     openai_cfg = OpenAIConfig()
-    # Use gpt-4o-mini explicitly for this demo task
-    openai_cfg.model_name = "gpt-4o"
+    # Allow selecting model via .env (OPENAI_MODEL), fallback keeps previous behavior.
+    openai_cfg.model_name = os.environ.get("OPENAI_MODEL", "gpt-4o")
     llm = OpenAIModel(config=openai_cfg.to_dict())
 
     # ReActConfig expects a dict/JSON, not a ReActConfig instance

@@ -11,9 +11,11 @@ question: |
   - Use media_tools to identify product details from the image.
   - Use Playwright and google-search to locate matching listings.
   - Public image URL (for tools that require image_url): https://cdn.jsdelivr.net/gh/viczxchen/MCPU-MM@f20b19952a24f80150b8a9aea3fd06c508c3285a/tasks/online_image/online_shopping/inputs/MMsearch_sample.png
-  - Return exactly one concise answer (for example model/version or current price).
+  - Return ONLY the vehicle model/version string (no explanation, no extra text).
+  - Example output style: "Land Rover Freelander LR2 HSE"
 
-output_format: {}
+output_format:
+  type: string
 
 mcp_servers:
   - name: playwright
